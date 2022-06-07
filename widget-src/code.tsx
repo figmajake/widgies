@@ -21,6 +21,8 @@ const {
 } = widget;
 
 const initial = generateDNA();
+// initial.value = initial.value.replace(/./g, "9");
+// initial.rarity = determineRarityFromValue(initial.value);
 
 const fills = [
   "#9e0142",
@@ -40,7 +42,19 @@ const textPropsGlobal: TextProps = {
   fontWeight: "bold",
 };
 
-function renderPie(value: string, rarity: Rarity) {
+function isValueComplete(value: string, rarity: Rarity) {
+  let complete = true;
+  const array = value.match(/(\d)\1*/g) || [];
+  array.forEach((curr, i) => {
+    const present = rarity.prominence.data[curr] || curr.length >= 2;
+    if (!present) {
+      complete = false;
+    }
+  });
+  return complete;
+}
+
+function renderPie(value: string, rarity: Rarity, owner: User | null) {
   const groups: { fill: string; start: number; end: number }[] = [];
   const valueLength = value.length;
   const step = (Math.PI * 2) / valueLength;
@@ -57,6 +71,8 @@ function renderPie(value: string, rarity: Rarity) {
     });
     pos = end;
   });
+  const inset = 0.5;
+  const insetSize = di * inset;
   return (
     <Frame width={di} height={di}>
       {groups.map(({ fill, start, end }, i) => (
@@ -65,7 +81,7 @@ function renderPie(value: string, rarity: Rarity) {
           arcData={{
             startingAngle: start,
             endingAngle: end,
-            innerRadius: 0.4,
+            innerRadius: inset,
           }}
           fill={fill}
           height={di}
@@ -77,6 +93,24 @@ function renderPie(value: string, rarity: Rarity) {
           width={di}
         />
       ))}
+      {owner && owner.photoUrl ? (
+        <Image
+          src={owner.photoUrl}
+          height={insetSize}
+          width={insetSize}
+          cornerRadius={insetSize}
+          x={{
+            type: "left-right",
+            leftOffset: (di - insetSize) / 2,
+            rightOffset: (di - insetSize) / 2,
+          }}
+          y={{
+            type: "top-bottom",
+            topOffset: (di - insetSize) / 2,
+            bottomOffset: (di - insetSize) / 2,
+          }}
+        />
+      ) : null}
     </Frame>
   );
 }
@@ -142,7 +176,7 @@ function Widget() {
   });
   const spawn = (node: WidgetNode) => {
     const self: WidgetNode = getNodeById(widgetId) as WidgetNode;
-    if (node) {
+    if (node && node.id !== widgetId) {
       const widget = self.cloneWidget({
         dna: generateDNAFromParentRarities(
           dna.rarity,
@@ -181,7 +215,11 @@ function Widget() {
     });
   });
   const rarity = determineRarityFromValue(dna.value);
-
+  const complete = isValueComplete(dna.value, rarity);
+  const textProps: TextProps = {
+    ...textPropsGlobal,
+    fill: complete ? "#FFF" : "#000",
+  };
   return (
     <AutoLayout
       direction="vertical"
@@ -190,19 +228,19 @@ function Widget() {
       height="hug-contents"
       cornerRadius={30}
       padding={32}
-      fill="#fff"
+      fill={complete ? "#000" : "#fff"}
       spacing={8}
-      stroke={"#f9f9f9"}
+      stroke={complete ? "#000" : "#f9f9f9"}
       strokeWidth={4}
     >
       {renderValue(dna.value, rarity, { fontSize: 24 })}
-      <Text {...textPropsGlobal} fontSize={12} horizontalAlignText="center">
-        R {rarity.factor.toFixed(4)} / A{dna.advantage} / G{" "}
+      <Text {...textProps} fontSize={12} horizontalAlignText="center">
+        R {rarity.factor.toFixed(4)} / {dna.advantage}x / G{" "}
         {generationFromState({ generationMin, generationMax })}
       </Text>
-      <Text {...textPropsGlobal} fontSize={10} horizontalAlignText="center">
-        {rarity.absence.factor.toFixed(4)} /{" "}
-        {rarity.prominence.factor.toFixed(4)} /{" "}
+      <Text {...textProps} fontSize={10} horizontalAlignText="center">
+        A {rarity.absence.factor.toFixed(4)} / P{" "}
+        {rarity.prominence.factor.toFixed(4)} / R{" "}
         {rarity.repeats.factor.toFixed(4)}
       </Text>
       <AutoLayout spacing={8} verticalAlignItems="center">
@@ -214,7 +252,7 @@ function Widget() {
           {renderValue(parentX, determineRarityFromValue(parentX), {
             fontSize: 12,
           })}
-          <Text {...textPropsGlobal} fontSize={10}>
+          <Text {...textProps} fontSize={10}>
             R {determineRarityFromValue(parentX).factor.toFixed(4)} / G{" "}
             {parentXGen}
           </Text>
@@ -224,17 +262,8 @@ function Widget() {
           horizontalAlignItems="center"
           spacing={8}
         >
-          {renderPie(dna.value, rarity)}
-          {owner && owner.photoUrl ? (
-            <Image
-              src={owner?.photoUrl}
-              height={20}
-              width={20}
-              cornerRadius={20}
-            />
-          ) : owner ? (
-            <Text>{owner.name}</Text>
-          ) : null}
+          {renderPie(dna.value, rarity, owner)}
+          {owner && !owner.photoUrl ? <Text>{owner.name}</Text> : null}
         </AutoLayout>
         <AutoLayout
           spacing={4}
@@ -244,7 +273,7 @@ function Widget() {
           {renderValue(parentY, determineRarityFromValue(parentY), {
             fontSize: 12,
           })}
-          <Text {...textPropsGlobal} fontSize={10}>
+          <Text {...textProps} fontSize={10}>
             R {determineRarityFromValue(parentY).factor.toFixed(4)} / G{" "}
             {parentYGen}
           </Text>

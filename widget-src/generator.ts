@@ -70,8 +70,7 @@ export function determineRarityFromValue(value: string) {
   return rarity;
 }
 
-function generateValue(advantage: number): WidgieDNA {
-  const scale = 1000000000000000;
+function generateValue(advantage: number, scale = 10000000): WidgieDNA {
   const number = Math.floor(Math.random() * 9 * scale) + scale;
   const value = number.toString();
   const rarity = determineRarityFromValue(value);
@@ -79,14 +78,22 @@ function generateValue(advantage: number): WidgieDNA {
 }
 
 export function generateDNA(advantage = 1): WidgieDNA {
-  let value: WidgieDNA = generateValue(advantage);
+  const valueAV: WidgieDNA = generateValue(advantage);
+  const valueBV: WidgieDNA = generateValue(advantage);
+  let valueA =
+    valueAV.rarity.factor > valueBV.rarity.factor ? valueAV : valueBV;
+  let valueB =
+    valueAV.rarity.factor > valueBV.rarity.factor ? valueBV : valueAV;
   for (let i = 0; i < advantage - 1; i++) {
     const next = generateValue(advantage);
-    if (!value || next.rarity.factor > value.rarity.factor) {
-      value = next;
+    if (next.rarity.factor > valueA.rarity.factor) {
+      valueA = next;
+    } else if (next.rarity.factor > valueB.rarity.factor) {
+      valueB = next;
     }
   }
-  return value;
+  const value = valueA.value + valueB.value;
+  return { value, advantage, rarity: determineRarityFromValue(value) };
 }
 
 export function generateDNAFromParentRarities(
@@ -94,6 +101,6 @@ export function generateDNAFromParentRarities(
   rarityB: Rarity
 ): WidgieDNA {
   const rarity = (rarityA.factor + rarityB.factor) / 2;
-  const advantage = Math.round(Math.pow(rarity, 2) * 5000);
+  const advantage = Math.round(Math.pow(rarity, 4) * 10000);
   return generateDNA(advantage);
 }
