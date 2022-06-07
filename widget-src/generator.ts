@@ -1,106 +1,103 @@
 export const EPOCH = "EPOCH";
-interface RarityType {
-  factor: number;
-  data: { [key: string]: number };
+
+interface Pair {
+  value: string;
+  pair: boolean;
+  notable: boolean;
 }
 
-export interface Rarity {
-  factor: number;
-  absence: RarityType;
-  prominence: RarityType;
-  repeats: RarityType;
-}
-
-export interface WidgieDNA {
+export interface Code {
+  pairs: Pair[];
+  double: number;
+  unique: number;
+  score: number;
+  sequence: number;
   advantage: number;
-  rarity: Rarity;
   value: string;
 }
 
-export function determineRarityFromValue(value: string) {
-  const valueLength = value.length;
-  const matches = value.match(/((\d)\2+)/g) || [];
-  const rarity: Rarity = {
-    factor: 0,
-    repeats: { factor: 0, data: {} },
-    absence: { factor: 0, data: {} },
-    prominence: { factor: 0, data: {} },
+export function generateCodeFromParentCodes(codeA: Code, codeB: Code): Code {
+  const advantage = Math.ceil(
+    Math.pow((codeA.score + codeB.score) / 40, 3) * 20000
+  );
+  return generateCode(advantage);
+}
+
+export function generateCode(advantage = 1): Code {
+  // return codeFromString("9999999999991111", advantage);
+  // return codeFromString("9999999999999999", advantage);
+  const generateCode = () =>
+    codeFromPairs(
+      [generatePair(), generatePair(), generatePair(), generatePair()],
+      advantage
+    );
+  const startA = generateCode();
+  const startB = generateCode();
+  let bestA = startA.score > startB.score ? startA : startB;
+  let bestB = startA.score > startB.score ? startB : startA;
+  for (let i = 0; i < advantage - 2; i++) {
+    const code = generateCode();
+    if (code.score > bestA.score) {
+      bestB = bestA;
+      bestA = code;
+    } else if (code.score > bestB.score) {
+      bestB = code;
+    }
+  }
+  return codeFromString(bestA.value + bestB.value, advantage);
+}
+
+export function codeFromString(string: string, advantage = 0): Code {
+  const pairs: Pair[] = [];
+  for (let i = 0; i < string.length; i += 2) {
+    pairs.push(pairFromValues(string.charAt(i), string.charAt(i + 1)));
+  }
+  return codeFromPairs(pairs, advantage);
+}
+
+function generatePair(): Pair {
+  const single = () =>
+    Math.floor(Math.random() * 16)
+      .toString(16)
+      .toUpperCase();
+  const valueA = single();
+  const valueB = single();
+  return pairFromValues(valueA, valueB);
+}
+
+function pairFromValues(valueA: string, valueB: string): Pair {
+  const pair = valueA === valueB;
+  return { value: valueA + valueB, pair, notable: false };
+}
+
+function codeFromPairs(pairs: Pair[], advantage: number): Code {
+  let double = 0;
+  let sequence = 0;
+  let present: { [k: string]: 1 } = {};
+
+  pairs.forEach((pair, i) => {
+    if (pair.pair) {
+      double += 1;
+      pair.notable = true;
+    }
+    const prev = i > 0 ? pair.value === pairs[i - 1].value : false;
+    const next =
+      i < pairs.length - 1 ? pair.value === pairs[i + 1].value : false;
+    if (prev || next) {
+      pair.notable = true;
+      sequence += 2;
+    }
+    present[pair.value.charAt(0)] = 1;
+    present[pair.value.charAt(1)] = 1;
+  });
+  const unique = 17 - Object.keys(present).length;
+  return {
+    double,
+    sequence,
+    unique,
+    score: double + sequence + unique,
+    pairs,
+    advantage,
+    value: pairs.map((p) => p.value).join(""),
   };
-  if (value === EPOCH) {
-    return rarity;
-  }
-  const repeats: { [k: string]: number } = {};
-  const numbers: { [k: string]: number } = {};
-  for (let i = 0; i <= valueLength; i++) {
-    if (i < 10) {
-      numbers[i] = 0;
-    }
-    repeats[i] = 0;
-  }
-
-  matches.forEach((match) => repeats[match.length]++);
-  value.split("").forEach((number) => numbers[number]++);
-
-  for (let length in repeats) {
-    const count = repeats[length];
-    if (count > 0) {
-      rarity.repeats.data[length] = count;
-      rarity.repeats.factor += (Number(length) * count) / valueLength;
-    }
-  }
-
-  let zeroes = 0;
-  for (let number in numbers) {
-    const count = numbers[number];
-    if (count >= valueLength / 5) {
-      rarity.prominence.factor += Math.pow(count / (valueLength / 1.5), 2);
-      rarity.prominence.data[number] = count;
-    } else if (count === 0) {
-      zeroes++;
-      rarity.absence.data[number] = count;
-    }
-  }
-  rarity.absence.factor = Math.pow(zeroes / 8, 2);
-  const sorted = [
-    rarity.repeats.factor,
-    rarity.absence.factor,
-    rarity.prominence.factor,
-  ].sort();
-  rarity.factor = (sorted[1] + sorted[2]) / 2;
-  return rarity;
-}
-
-function generateValue(advantage: number, scale = 10000000): WidgieDNA {
-  const number = Math.floor(Math.random() * 9 * scale) + scale;
-  const value = number.toString();
-  const rarity = determineRarityFromValue(value);
-  return { advantage, value, rarity };
-}
-
-export function generateDNA(advantage = 1): WidgieDNA {
-  const valueAV: WidgieDNA = generateValue(advantage);
-  const valueBV: WidgieDNA = generateValue(advantage);
-  let valueA =
-    valueAV.rarity.factor > valueBV.rarity.factor ? valueAV : valueBV;
-  let valueB =
-    valueAV.rarity.factor > valueBV.rarity.factor ? valueBV : valueAV;
-  for (let i = 0; i < advantage - 1; i++) {
-    const next = generateValue(advantage);
-    if (next.rarity.factor > valueA.rarity.factor) {
-      valueA = next;
-    } else if (next.rarity.factor > valueB.rarity.factor) {
-      valueB = next;
-    }
-  }
-  const value = valueA.value + valueB.value;
-  return { value, advantage, rarity: determineRarityFromValue(value) };
-}
-
-export function generateDNAFromParentRarities(
-  rarityA: Rarity,
-  rarityB: Rarity
-): WidgieDNA {
-  const rarity = (rarityA.factor + rarityB.factor) / 2;
-  const advantage = Math.round(Math.pow(rarity, 4) * 10000);
-  return generateDNA(advantage);
 }
