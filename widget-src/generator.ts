@@ -18,7 +18,7 @@ export interface Code {
 
 export function generateCodeFromParentCodes(codeA: Code, codeB: Code): Code {
   const advantage = Math.ceil(
-    Math.pow((codeA.score + codeB.score) / 40, 3) * 20000
+    Math.pow((codeA.score + codeB.score) / 80, 4) * 20000
   );
   return generateCode(advantage);
 }
