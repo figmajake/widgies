@@ -3,7 +3,6 @@ import {
   Code,
   generateCode,
   generateCodeFromParentCodes,
-  codeFromString,
 } from "./generator";
 
 const { currentPage, currentUser, getNodeById, notify, widget } = figma;
@@ -52,10 +51,6 @@ const textPropsGlobal: TextProps = {
   fontWeight: "bold",
 };
 
-function isValueComplete(code: Code) {
-  return !Boolean(code.pairs.filter(({ notable }) => !notable).length);
-}
-
 function renderPie(
   code: Code,
   owner: User | null,
@@ -82,7 +77,7 @@ function renderPie(
     }
     pos += step * 2;
   });
-  const inset = 0.5;
+  const inset = 0.3;
   const insetSize = di * inset;
   return (
     <Frame width={di} height={di} {...frameProps} cornerRadius={di}>
@@ -142,7 +137,12 @@ function renderPie(
             bottomOffset: (di - insetSize) / 2,
           }}
         >
-          <Text fill="#FFF" fontSize={insetSize * 0.55} fontWeight={"bold"}>
+          <Text
+            fill="#FFF"
+            {...textPropsGlobal}
+            fontSize={insetSize * 0.55}
+            fontWeight={"bold"}
+          >
             {code.score}
           </Text>
         </AutoLayout>
@@ -207,8 +207,6 @@ function Widget() {
   const [code] = useSyncedState<Code>("code", initial);
   const [parentX] = useSyncedState("parentX", EPOCH);
   const [parentY] = useSyncedState("parentY", EPOCH);
-  const [parentXGen] = useSyncedState("parentXGen", "0-0");
-  const [parentYGen] = useSyncedState("parentYGen", "0-0");
   const [generationMax] = useSyncedState("generationMax", 1);
   const [generationMin] = useSyncedState("generationMin", 1);
   const widgetId = useWidgetId();
@@ -255,66 +253,38 @@ function Widget() {
       }
     });
   });
-  const complete = isValueComplete(code);
-  const textProps: TextProps = {
-    ...textPropsGlobal,
-    fill: complete ? "#FFF" : "#000",
-  };
-  return pieView ? (
-    <AutoLayout onClick={() => setPieView(false)}>
-      {renderPie(code, owner, 200, true, {
-        fill: "#ccc",
-        stroke: complete ? "#000" : undefined,
-        strokeWidth: 16,
-      })}
-    </AutoLayout>
-  ) : (
+  const { complete } = code;
+  return (
     <AutoLayout
       direction="vertical"
       horizontalAlignItems="center"
       verticalAlignItems="center"
       height="hug-contents"
-      padding={32}
-      fill={complete ? "#000" : "#fff"}
-      spacing={8}
-      stroke={complete ? "#000" : "#f9f9f9"}
-      strokeWidth={4}
+      padding={12}
     >
-      {renderValue(code, { fontSize: 24 })}
-      <Text {...textProps} fontSize={12} horizontalAlignText="center">
-        {code.score} (D{code.double} S{code.sequence} U{code.unique}) /{" "}
-        {code.advantage}x / G{" "}
-        {generationFromState({ generationMin, generationMax })}
-      </Text>
-      <AutoLayout spacing={8} verticalAlignItems="center">
-        <AutoLayout
-          spacing={4}
-          direction="vertical"
-          horizontalAlignItems="center"
-        >
-          {renderValue(codeFromString(parentX), {
-            fontSize: 12,
+      {pieView ? (
+        <AutoLayout onClick={() => setPieView(false)}>
+          {renderPie(code, owner, 100, true, {
+            fill: "#ccc",
+            stroke: complete ? "#000" : undefined,
+            strokeWidth: 4,
           })}
         </AutoLayout>
+      ) : (
         <AutoLayout
-          direction="vertical"
-          horizontalAlignItems="center"
-          spacing={8}
+          stroke="#000"
+          strokeWidth={complete ? 4 : 0}
+          onClick={() => setPieView(true)}
+          tooltip={`${code.score} (D${code.doubles} S${code.repeats} U${
+            code.uniques
+          }) / ${code.advantage}x / G ${generationFromState({
+            generationMin,
+            generationMax,
+          })}`}
         >
-          <AutoLayout onClick={() => setPieView(true)}>
-            {renderPie(code, owner, 50)}
-          </AutoLayout>
+          {renderValue(code, { fontSize: 24 })}
         </AutoLayout>
-        <AutoLayout
-          spacing={4}
-          direction="vertical"
-          horizontalAlignItems="center"
-        >
-          {renderValue(codeFromString(parentY), {
-            fontSize: 12,
-          })}
-        </AutoLayout>
-      </AutoLayout>
+      )}
     </AutoLayout>
   );
 }
